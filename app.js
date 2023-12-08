@@ -12,6 +12,7 @@ mongoose
   .then(() => console.log("Connexion à MongoDB réussie !"))
   .catch(() => console.log("Connexion à MongoDB échouée !"));
 
+//Cette ligne pour analyser les corps de requêtes au format JSON
 app.use(express.json());
 
 app.use((req, res, next) => {
@@ -31,6 +32,8 @@ app.use((req, res, next) => {
 });
 //On configure une route pour servir des fichiers statiques situés dans le répertoire "images".
 app.use("/images", express.static(path.join(__dirname, "images")));
+//On configure des routes modulaires (pour alléger le code ailleurs et pour séparer les logiques).
+//Par exemple, toutes les routes définies dans booksRoutes seront préfixées par "/api/books".
 app.use("/api/books", booksRoutes);
 app.use("/api/auth", userRoutes);
 

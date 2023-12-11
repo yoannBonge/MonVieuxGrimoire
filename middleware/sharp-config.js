@@ -21,7 +21,7 @@ module.exports = (req, res, next) => {
         fit: sharp.fit.inside,
         withoutEnlargement: true,
       })
-      .toFile(outputPath, (error, info) => {
+      .toFile(outputPath, (error) => {
         if (error) {
           return res
             .status(500)

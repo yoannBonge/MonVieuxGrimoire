@@ -27,8 +27,34 @@ module.exports = (req, res, next) => {
             .status(500)
             .json({ error: "Erreur lors de l'optimisation de l'image." });
         }
-        //On met à jour la requête en ajoutant le nouveau nom de fichier.
+
+        // Met à jour la requête en ajoutant le nouveau nom de fichier.
         req.file.filename = outputFileName;
+
+        fs.chmod(req.file.path, 0o777, (chmodError) => {
+          if (chmodError) {
+            console.error(
+              "Erreur lors de la modification des permissions:",
+              chmodError
+            );
+          }
+        });
+        fs.unlink(req.file.path, (unlinkError) => {
+          if (unlinkError) {
+            if (unlinkError.code === "ENOENT") {
+              console.warn(
+                "Le fichier a déjà été supprimé par un autre processus."
+              );
+            } else {
+              console.error(
+                "Erreur lors de la suppression de l'image non traitée:",
+                unlinkError
+              );
+            }
+          }
+
+          next();
+        });
 
         if (!fs.existsSync(outputPath)) {
           return res.status(500).json({
@@ -36,24 +62,7 @@ module.exports = (req, res, next) => {
               "Le fichier de sortie après le traitement Sharp n'existe pas",
           });
         }
-
-        // fs.unlink(req.file.path, (unlinkError) => {
-        //   if (unlinkError) {
-        //     if (unlinkError.code === "ENOENT") {
-        //       console.warn(
-        //         "Le fichier a déjà été supprimé par un autre processus."
-        //       );
-        //     } else {
-        //       console.error(
-        //         "Erreur lors de la suppression de l'image non traitée:",
-        //         unlinkError
-        //       );
-        //     }
-        //   }
-
-        next();
       });
-    // });
   } else {
     console.log("Image non modifiée");
     next();

@@ -1,21 +1,16 @@
 const sharp = require("sharp");
 const path = require("path");
-const fs = require("fs");
 
 module.exports = (req, res, next) => {
-  if (req.file && req.file.path) {
+  //On vérifie si la requête contient un fichier et si ce dernier a un contenu binaire.
+  if (req.file && req.file.buffer) {
     const name = req.file.originalname.split(" ").join("_");
-    //On obtient l'extension du fichier.
     const extension = path.extname(name);
-    //On retire l'extension du nom du fichier original.
     const fileName = name.replace(extension, "");
-    //On crée un nouveau nom pour le fichier optimisé...
     const outputFileName = `${fileName}_${Date.now()}.webp`;
-    //...ainsi qu'un chemin pour ce dernier.
     const outputPath = path.join(__dirname, "..", "images", outputFileName);
 
-    //On initialise un objet Sharp avec l'image du fichier spécifié par req.file.path
-    sharp(req.file.path)
+    sharp(req.file.buffer)
       .toFormat("webp", { quality: 50 })
       .resize(300, 500, {
         fit: sharp.fit.inside,
@@ -23,45 +18,17 @@ module.exports = (req, res, next) => {
       })
       .toFile(outputPath, (error) => {
         if (error) {
+          console.error("Sharp error:", error);
           return res
             .status(500)
             .json({ error: "Erreur lors de l'optimisation de l'image." });
         }
 
-        // Met à jour la requête en ajoutant le nouveau nom de fichier.
-        req.file.filename = outputFileName;
+        //On stocke le nom du fichier généré par Sharp dans req.sharpFileName (pour l'utiliser
+        //dans les controllers)
+        req.sharpFileName = outputFileName;
 
-        fs.chmod(req.file.path, 0o777, (chmodError) => {
-          if (chmodError) {
-            console.error(
-              "Erreur lors de la modification des permissions:",
-              chmodError
-            );
-          }
-        });
-        fs.unlink(req.file.path, (unlinkError) => {
-          if (unlinkError) {
-            if (unlinkError.code === "ENOENT") {
-              console.warn(
-                "Le fichier a déjà été supprimé par un autre processus."
-              );
-            } else {
-              console.error(
-                "Erreur lors de la suppression de l'image non traitée:",
-                unlinkError
-              );
-            }
-          }
-
-          next();
-        });
-
-        if (!fs.existsSync(outputPath)) {
-          return res.status(500).json({
-            error:
-              "Le fichier de sortie après le traitement Sharp n'existe pas",
-          });
-        }
+        next();
       });
   } else {
     console.log("Image non modifiée");

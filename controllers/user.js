@@ -31,6 +31,7 @@ exports.login = (req, res, next) => {
           .json({ message: "Paire login/mot de passe incorrecte" });
       }
       bcrypt
+        //On compare le mot de passe de la requête avec celui stocké en BDD.
         .compare(req.body.password, user.password)
         .then((valid) => {
           if (!valid) {
@@ -39,6 +40,7 @@ exports.login = (req, res, next) => {
               .json({ message: "Paire login/mot de passe incorrecte" });
           }
           res.status(200).json({
+            //Si tout est bon, on renvoie un objet avec l'ID de l'utilisateur ainsi qu'un token.
             userId: user._id,
             token: jwt.sign(
               {

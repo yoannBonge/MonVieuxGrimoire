@@ -1,8 +1,10 @@
 const Book = require("../models/Book");
 const fs = require("fs");
+const path = require("path");
 
 exports.createBook = (req, res) => {
-  //On initialise un objet livre duquel on va extraire les données du body de la requête.
+  //On transforme les données du corps de la requête en objet JSON dont on pourra extraire les données
+  //facilement.
   const bookObject = JSON.parse(req.body.book);
   //On supprime le champ _id généré par MongoDB.
   delete bookObject._id;
@@ -12,7 +14,7 @@ exports.createBook = (req, res) => {
     ...bookObject,
     userId: req.auth.userId,
     imageUrl: `${req.protocol}://${req.get("host")}/images/${
-      req.file.filename
+      req.sharpFileName
     }`,
   });
 
@@ -33,19 +35,22 @@ exports.getOneBook = (req, res) => {
 };
 
 exports.modifyBook = (req, res) => {
-  //On commence par vérifier si la requête contient un fichier (une image). Si oui, on fait comme dans createBook,
-  //sinon on récupère simplement toutes les infos du corps de la requête.
+  //On commence par vérifier si la requête contient un fichier (une image).
+  //Si oui, on fait comme dans createBook, sinon on récupère simplement toutes les infos du corps
+  //de la requête.
   const bookObject = req.file
     ? {
         ...JSON.parse(req.body.book),
         imageUrl: `${req.protocol}://${req.get("host")}/images/${
-          req.file.filename
+          req.sharpFileName
         }`,
       }
     : { ...req.body };
 
   delete bookObject._userId;
 
+  //On pointe le livre à modifier en s'assurant que celui qui cherche à le modifier est bien celui
+  //qui l'a crée.
   Book.findOne({ _id: req.params.id })
     .then((book) => {
       if (book.userId != req.auth.userId) {
@@ -55,7 +60,44 @@ exports.modifyBook = (req, res) => {
           { _id: req.params.id },
           { ...bookObject, _id: req.params.id }
         )
-          .then(() => res.status(200).json({ message: "Livre modifié!" }))
+          .then(() => {
+            //Si la requête contient une nouvelle image et que le livre en contenait déjà une,
+            //on supprime cette ancienne image du serveur.
+            const oldImageUrl = book.imageUrl;
+            if (req.file && oldImageUrl) {
+              try {
+                const filename = oldImageUrl.split("/images/")[1];
+                const oldImagePath = path.join(
+                  __dirname,
+                  "..",
+                  "images",
+                  filename
+                );
+
+                fs.unlink(oldImagePath, (error) => {
+                  if (error) {
+                    if (error.code === "ENOENT") {
+                      console.log(
+                        "Le fichier n'existe pas, il a peut-être déjà été supprimé."
+                      );
+                    } else {
+                      console.error(
+                        "Erreur lors de la suppression de l'ancienne image :",
+                        error
+                      );
+                    }
+                  }
+                });
+              } catch (error) {
+                console.error(
+                  "Erreur lors de la construction de oldImagePath :",
+                  error
+                );
+              }
+            }
+
+            res.status(200).json({ message: "Livre modifié!" });
+          })
           .catch((error) => res.status(401).json({ error }));
       }
     })
